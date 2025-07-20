@@ -5,6 +5,8 @@ module dao_addr::council {
     use std::error;
     use dao_addr::admin;
 
+    use aptos_framework::object::{Self, Object};
+
     const ENOT_ADMIN: u64 = 1;
     const ECOUNCIL_MEMBER_NOT_FOUND: u64 = 2;
     const EMIN_MEMBERS_CONSTRAINT: u64 = 8;
@@ -21,17 +23,22 @@ module dao_addr::council {
         initial_members: vector<address>,
         min_members: u64,
         max_members: u64
-    ) {
+    ): Object<CouncilConfig> {
         let addr = signer::address_of(account);
         assert!(!exists<CouncilConfig>(addr), error::already_exists(0));
         // Changed to allow empty initial council
         assert!(vector::length(&initial_members) <= max_members, error::invalid_argument(EMAX_MEMBERS_CONSTRAINT));
 
-        move_to(account, CouncilConfig {
+        let council = CouncilConfig {
             members: initial_members,
             min_members,
             max_members
-        });
+        };
+
+        let constructor_ref = object::create_object_from_account(account);
+        let object_signer = object::generate_signer(&constructor_ref);
+        move_to(&object_signer, council);
+        object::object_from_constructor_ref(&constructor_ref)
     }
 
     public fun add_council_member(admin: &signer, new_member: address) acquires CouncilConfig {
